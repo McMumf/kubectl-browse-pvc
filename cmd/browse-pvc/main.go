@@ -90,9 +90,11 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		if err != nil {
 			log.Fatalf("Failed to load kubeconfig: %v", err)
 		}
-		namespace = config.Contexts[config.CurrentContext].Namespace
-		if err != nil {
-			log.Fatalf("Failed to get namespace from current context: %v", err)
+		if ctx, ok := config.Contexts[config.CurrentContext]; ok {
+			namespace = ctx.Namespace
+		}
+		if namespace == "" {
+			namespace = "default"
 		}
 	}
 
@@ -197,6 +199,11 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		timeout--
 	}
 
+	if timeout == 0 {
+		deleteJob(clientset, namespace, pvcbGetJob.Name)
+		log.Fatalf("Timed out waiting for job to become active")
+	}
+
 	// Find the created pod.
 	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "job-name=" + pvcbGetJob.Name,
@@ -231,7 +238,8 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 
 	podSpinner.Stop()
 	if timeout == 0 {
-		log.Fatalf("Pod failed to start")
+		deleteJob(clientset, namespace, pvcbGetJob.Name)
+		log.Fatalf("Timed out waiting for pod to start")
 	}
 
 	request := clientset.CoreV1().RESTClient().
@@ -337,4 +345,14 @@ func getPodLogs(clientset *kubernetes.Clientset, namespace string, jobName strin
 		return "", fmt.Errorf("failed to copy logs: %v", err)
 	}
 	return buf.String(), nil
+}
+
+func deleteJob(clientset *kubernetes.Clientset, namespace, name string) {
+	deletePolicy := metav1.DeletePropagationForeground
+	err := clientset.BatchV1().Jobs(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	})
+	if err != nil {
+		log.Printf("Warning: failed to delete job %s: %v", name, err)
+	}
 }
