@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -145,7 +146,7 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		resolvedJobName = "browse-" + pvcName
 	}
 	if len(resolvedJobName) > 63 {
-		resolvedJobName = resolvedJobName[:63]
+		resolvedJobName = strings.TrimRight(resolvedJobName[:63], "-.")
 	}
 
 	options := &utils.PodOptions{
