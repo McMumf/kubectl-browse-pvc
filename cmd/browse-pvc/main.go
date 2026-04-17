@@ -213,12 +213,18 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		log.Fatalf("Failed to get pods: %v", err)
 	}
 
-	if len(podList.Items) != 1 {
-		fmt.Printf("%d\n", len(podList.Items))
-		log.Fatalf("Found an unexpected number of controllers, this shouldn't happen.")
+	var activePods []corev1.Pod
+	for _, p := range podList.Items {
+		if p.DeletionTimestamp == nil {
+			activePods = append(activePods, p)
+		}
 	}
 
-	pod := &podList.Items[0]
+	if len(activePods) == 0 {
+		log.Fatalf("No active pods found for job %s", pvcbGetJob.Name)
+	}
+
+	pod := &activePods[0]
 
 	podSpinner := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 	podSpinner.Suffix = " Waiting for Pod to Start\n"
