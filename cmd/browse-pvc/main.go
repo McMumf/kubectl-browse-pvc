@@ -32,6 +32,7 @@ var Version string
 var containerUser int
 var readOnly bool
 var jobName string
+var podTimeout int
 
 var validCommands = []string{"image", "container-user"}
 
@@ -61,6 +62,7 @@ func main() {
 	rootCmd.Flags().IntVarP(&containerUser, "container-user", "u", 0, "User ID to run the container as")
 	rootCmd.Flags().BoolVarP(&readOnly, "read-only", "r", false, "Mount the PVC as read-only")
 	rootCmd.Flags().StringVarP(&jobName, "job-name", "j", "", "Override the generated job name (auto-truncated to 63 chars)")
+	rootCmd.Flags().IntVarP(&podTimeout, "timeout", "t", 30, "Seconds to wait for the browse pod to start")
 	kubeConfigFlags.AddFlags(rootCmd.Flags())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -177,7 +179,7 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		log.Fatalf("Failed to create job: %v", err)
 	}
 
-	timeout := 30
+	timeout := podTimeout
 
 	for timeout > 0 {
 		pvcbGetJob, err = clientset.BatchV1().Jobs(namespace).Get(context.TODO(), pvcbGetJob.GetObjectMeta().GetName(), metav1.GetOptions{})
