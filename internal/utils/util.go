@@ -16,6 +16,7 @@ type PodOptions struct {
 	User        int64
 	Tolerations []corev1.Toleration
 	ReadOnly    bool
+	JobName     string
 }
 
 var script = `
@@ -93,7 +94,7 @@ func BuildPvcbGetJob(options PodOptions) *batchv1.Job {
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "browse-" + options.Pvc.Name,
+			Name:      options.JobName,
 			Namespace: options.Namespace,
 		},
 		Spec: batchv1.JobSpec{
@@ -102,7 +103,7 @@ func BuildPvcbGetJob(options PodOptions) *batchv1.Job {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "browse-pvc",
 					Labels: map[string]string{
-						"job-name": "browse-" + options.Pvc.Name,
+						"job-name": options.JobName,
 					},
 				},
 				Spec: corev1.PodSpec{

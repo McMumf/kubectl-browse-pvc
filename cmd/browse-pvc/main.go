@@ -31,6 +31,7 @@ var image string
 var Version string
 var containerUser int
 var readOnly bool
+var jobName string
 
 var validCommands = []string{"image", "container-user"}
 
@@ -59,6 +60,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&image, "image", "i", "alpine", "Image to mount job to")
 	rootCmd.Flags().IntVarP(&containerUser, "container-user", "u", 0, "User ID to run the container as")
 	rootCmd.Flags().BoolVarP(&readOnly, "read-only", "r", false, "Mount the PVC as read-only")
+	rootCmd.Flags().StringVarP(&jobName, "job-name", "j", "", "Override the generated job name (auto-truncated to 63 chars)")
 	kubeConfigFlags.AddFlags(rootCmd.Flags())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -134,6 +136,14 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		}
 	}
 
+	resolvedJobName := jobName
+	if resolvedJobName == "" {
+		resolvedJobName = "browse-" + pvcName
+	}
+	if len(resolvedJobName) > 63 {
+		resolvedJobName = resolvedJobName[:63]
+	}
+
 	options := &utils.PodOptions{
 		Image:       image,
 		Namespace:   namespace,
@@ -144,6 +154,7 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 		User:        int64(containerUser),
 		Tolerations: tolerationsForNode,
 		ReadOnly:    readOnly,
+		JobName:     resolvedJobName,
 	}
 
 	// Build the Job
@@ -154,7 +165,7 @@ func browseCommand(kubeConfigFlags *genericclioptions.ConfigFlags, pvcName strin
 	//Handle if there were command args
 	if len(commandArgs) > 0 {
 		waitForJobCompletion(*clientset, namespace, pvcbGetJob.Name)
-		logs, err := getPodLogs(clientset, namespace, targetPvc.Name)
+		logs, err := getPodLogs(clientset, namespace, resolvedJobName)
 		if err != nil {
 			log.Fatalf("Failed to get logs: %v", err)
 		}
@@ -290,10 +301,10 @@ func waitForJobCompletion(clientset kubernetes.Clientset, namespace string, jobN
 	return fmt.Errorf("job failed to complete within 300s")
 }
 
-func getPodLogs(clientset *kubernetes.Clientset, namespace string, pvcName string) (string, error) {
+func getPodLogs(clientset *kubernetes.Clientset, namespace string, jobName string) (string, error) {
 
 	//find the pod based on the label applied to the pod in the job
-	labelSelector := fmt.Sprintf("job-name=browse-%s", pvcName)
+	labelSelector := fmt.Sprintf("job-name=%s", jobName)
 	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
